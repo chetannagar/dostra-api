@@ -1,10 +1,10 @@
-# CRM Lead Ingestion API
+# Dostra CRM Lead Ingestion API
 
-API-only Laravel application for ingesting lead data from WordPress sites through Zapier webhooks.
+Dostra-API is a API-only Laravel application for ingesting lead data from WordPress sites through Zapier webhooks.
 
 ## Purpose
 
-Each client website sends lead data through Zapier to this API. The API stores the lead in the database and exposes simple read endpoints for downstream CRM use.
+Each client website sends lead data through Zapier to this API. Dostra-API stores the lead in the database and exposes simple read endpoints for downstream CRM use.
 
 ## Stack
 
