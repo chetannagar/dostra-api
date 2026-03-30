@@ -7,23 +7,24 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\WebhookController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware('auth:sanctum')->group(function (): void {
+Route::post('/webhook/leads', [WebhookController::class, 'store'])
+    ->middleware(['validate.lead.webhook', 'throttle:webhook']);
+
+Route::post('/login', [AuthController::class, 'store'])
+    ->middleware('throttle:login');
+
+Route::middleware(['auth:sanctum', 'throttle:api.crm'])->group(function (): void {
     Route::get('/me', [AuthController::class, 'show']);
     Route::post('/logout', [AuthController::class, 'destroy']);
 
     Route::get('/clients', [ClientController::class, 'index']);
     Route::get('/clients/{client}', [ClientController::class, 'show']);
 
-    Route::get('/leads', [LeadController::class, 'index']);
-    Route::get('/leads/{lead}', [LeadController::class, 'show']);
-
     Route::get('/users', [UserController::class, 'index']);
     Route::post('/users', [UserController::class, 'store']);
     Route::get('/users/{user}', [UserController::class, 'show']);
     Route::put('/users/{user}', [UserController::class, 'update']);
+
+    Route::get('/leads', [LeadController::class, 'index']);
+    Route::get('/leads/{lead}', [LeadController::class, 'show']);
 });
-
-Route::post('/webhook/leads', [WebhookController::class, 'store'])
-    ->middleware('validate.lead.webhook');
-
-Route::post('/login', [AuthController::class, 'store']);
