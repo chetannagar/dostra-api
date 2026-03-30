@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\LoginRequest;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -11,12 +12,10 @@ class AuthController extends Controller
 {
     /**
      * Handle the incoming login request.
-     * @param LoginRequest $request
-     * @return JsonResponse
      */
     public function store(LoginRequest $request): JsonResponse
     {
-        $user = \App\Models\User::query()
+        $user = User::query()
             ->with('clients')
             ->where('email', $request->input('email'))
             ->first();
@@ -37,8 +36,6 @@ class AuthController extends Controller
 
     /**
      * Display the authenticated user's information.
-     * @param Request $request
-     * @return JsonResponse
      */
     public function show(Request $request): JsonResponse
     {
@@ -49,8 +46,6 @@ class AuthController extends Controller
 
     /**
      * Handle the logout request.
-     * @param Request $request
-     * @return JsonResponse
      */
     public function destroy(Request $request): JsonResponse
     {
