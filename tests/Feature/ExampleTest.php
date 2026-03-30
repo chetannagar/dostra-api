@@ -2,7 +2,9 @@
 
 use App\Models\Client;
 use App\Models\Lead;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\Sanctum;
 
 uses(RefreshDatabase::class);
 
@@ -46,6 +48,10 @@ test('it stores a lead from the webhook endpoint', function () {
 });
 
 test('it returns leads ordered from newest to oldest', function () {
+    $admin = User::factory()->create([
+        'role' => 'admin',
+    ]);
+
     $olderClient = Client::factory()->create();
     $newerClient = Client::factory()->create();
 
@@ -77,6 +83,8 @@ test('it returns leads ordered from newest to oldest', function () {
         'updated_at' => now(),
     ])->save();
 
+    Sanctum::actingAs($admin);
+
     $response = $this->getJson('/api/leads');
 
     $response
@@ -86,6 +94,10 @@ test('it returns leads ordered from newest to oldest', function () {
 });
 
 test('it returns a single lead by route model binding', function () {
+    $admin = User::factory()->create([
+        'role' => 'admin',
+    ]);
+
     $client = Client::factory()->create();
 
     $lead = Lead::query()->create([
@@ -96,6 +108,8 @@ test('it returns a single lead by route model binding', function () {
         'source' => 'wpforms-zapier',
         'raw_payload' => ['type' => 'single'],
     ]);
+
+    Sanctum::actingAs($admin);
 
     $response = $this->getJson("/api/leads/{$lead->id}");
 
