@@ -60,6 +60,14 @@ class ClientPolicy
     }
 
     /**
+     * Determine whether the user can rotate the webhook secret.
+     */
+    public function rotateWebhookSecret(User $user, Client $client): bool
+    {
+        return $user->isAdmin();
+    }
+
+    /**
      * Determine whether the user can permanently delete the model.
      */
     public function forceDelete(User $user, Client $client): bool
