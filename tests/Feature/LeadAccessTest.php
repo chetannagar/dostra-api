@@ -40,7 +40,7 @@ test('an admin can view leads for all clients', function () {
 
     $response
         ->assertOk()
-        ->assertJsonCount(2)
+        ->assertJsonCount(2, 'data')
         ->assertJsonFragment(['id' => $firstLead->id])
         ->assertJsonFragment(['id' => $secondLead->id]);
 });
@@ -79,9 +79,9 @@ test('a client user only sees leads for assigned clients', function () {
 
     $response
         ->assertOk()
-        ->assertJsonCount(1)
-        ->assertJsonPath('0.id', $assignedLead->id)
-        ->assertJsonPath('0.client_id', $assignedClient->id);
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.id', $assignedLead->id)
+        ->assertJsonPath('data.0.client_id', $assignedClient->id);
 });
 
 test('a client user cannot view another clients lead', function () {

@@ -89,8 +89,9 @@ test('it returns leads ordered from newest to oldest', function () {
 
     $response
         ->assertOk()
-        ->assertJsonPath('0.id', $newerLead->id)
-        ->assertJsonPath('1.id', $olderLead->id);
+        ->assertJsonPath('data.0.id', $newerLead->id)
+        ->assertJsonPath('data.1.id', $olderLead->id);
+
 });
 
 test('it returns a single lead by route model binding', function () {
