@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>CRM Lead API</title>
+    <title>Dostro CRM API</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <link rel="stylesheet" href="{{ asset('css/index.css') }}">
@@ -10,7 +10,7 @@
 <body>
 
 <div class="container">
-    <h1>🚀 CRM Lead API</h1>
+    <h1>🚀 Dostro CRM API</h1>
     <div class="badge">Laravel 13 • Webhook API</div>
 
     <div class="card">
@@ -26,19 +26,19 @@
 
         <div class="endpoint">
             <span class="method post">POST</span>
-            <code>/webhook/leads</code>
+            <code>/api/webhook/leads</code>
             <p>Receive lead data from Zapier webhook</p>
         </div>
 
         <div class="endpoint">
             <span class="method get">GET</span>
-            <code>/leads</code>
+            <code>/api/leads</code>
             <p>Retrieve all leads</p>
         </div>
 
         <div class="endpoint">
             <span class="method get">GET</span>
-            <code>/leads/{client_id}</code>
+            <code>/api/leads/{client_id}</code>
             <p>Retrieve leads for a specific client</p>
         </div>
     </div>

@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('leads', function (Blueprint $table) {
             $table->id();
-            $table->string('client_id')->index();
+            $table->foreignId('client_id')->constrained()->cascadeOnDelete();
             $table->string('name')->nullable();
             $table->string('email')->nullable();
             $table->text('message')->nullable();
