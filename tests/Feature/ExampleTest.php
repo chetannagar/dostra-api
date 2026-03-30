@@ -28,6 +28,7 @@ test('it stores a lead from the webhook endpoint', function () {
         'CONTENT_TYPE' => 'application/json',
         'HTTP_ACCEPT' => 'application/json',
         'HTTP_X_CLIENT_KEY' => $client->client_key,
+        'HTTP_X_WEBHOOK_ID' => 'evt_example_test',
         'HTTP_X_WEBHOOK_TIMESTAMP' => (string) $timestamp,
         'HTTP_X_WEBHOOK_SIGNATURE' => $signature,
     ], $payload);

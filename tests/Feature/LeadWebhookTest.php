@@ -6,7 +6,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-function signedWebhookHeaders(Client $client, string $payload, int $timestamp): array
+function signedWebhookHeaders(Client $client, string $payload, int $timestamp, string $eventId = 'evt_123'): array
 {
     $signature = hash_hmac('sha256', $timestamp.'.'.$payload, $client->webhook_secret);
 
@@ -14,6 +14,7 @@ function signedWebhookHeaders(Client $client, string $payload, int $timestamp): 
         'CONTENT_TYPE' => 'application/json',
         'HTTP_ACCEPT' => 'application/json',
         'HTTP_X_CLIENT_KEY' => $client->client_key,
+        'HTTP_X_WEBHOOK_ID' => $eventId,
         'HTTP_X_WEBHOOK_TIMESTAMP' => (string) $timestamp,
         'HTTP_X_WEBHOOK_SIGNATURE' => $signature,
     ];
@@ -66,6 +67,7 @@ test('it rejects a webhook with an invalid signature', function () {
         'CONTENT_TYPE' => 'application/json',
         'HTTP_ACCEPT' => 'application/json',
         'HTTP_X_CLIENT_KEY' => $client->client_key,
+        'HTTP_X_WEBHOOK_ID' => 'evt_invalid_signature',
         'HTTP_X_WEBHOOK_TIMESTAMP' => (string) now()->timestamp,
         'HTTP_X_WEBHOOK_SIGNATURE' => 'invalid-signature',
     ], $payload);
