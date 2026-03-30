@@ -18,7 +18,9 @@ Route::middleware(['auth:sanctum', 'throttle:api.crm'])->group(function (): void
     Route::post('/logout', [AuthController::class, 'destroy']);
 
     Route::get('/clients', [ClientController::class, 'index']);
+    Route::post('/clients', [ClientController::class, 'store']);
     Route::get('/clients/{client}', [ClientController::class, 'show']);
+    Route::put('/clients/{client}', [ClientController::class, 'update']);
 
     Route::get('/users', [UserController::class, 'index']);
     Route::post('/users', [UserController::class, 'store']);
