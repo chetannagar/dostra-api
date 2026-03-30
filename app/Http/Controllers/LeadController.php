@@ -4,18 +4,31 @@ namespace App\Http\Controllers;
 
 use App\Models\Lead;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class LeadController extends Controller
 {
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        return response()->json(
-            Lead::query()->latest()->get()
-        );
+        $user = $request->user();
+
+        $query = Lead::query()->with('client')->latest();
+
+        if (! $user->isAdmin()) {
+            $clientIds = $user->clients()->pluck('clients.id');
+
+            $query->whereIn('client_id', $clientIds);
+        }
+
+        return response()->json($query->get());
     }
 
-    public function show(Lead $lead): JsonResponse
+    public function show(Request $request, Lead $lead): JsonResponse
     {
-        return response()->json($lead);
+        $this->authorize('view', $lead);
+
+        return response()->json(
+            $lead->load('client')
+        );
     }
 }
