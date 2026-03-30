@@ -2,7 +2,9 @@
 
 namespace App\Providers;
 
+use App\Models\Client;
 use App\Models\Lead;
+use App\Policies\ClientPolicy;
 use App\Policies\LeadPolicy;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
@@ -22,6 +24,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Gate::policy(Client::class, ClientPolicy::class);
         Gate::policy(Lead::class, LeadPolicy::class);
     }
 }
