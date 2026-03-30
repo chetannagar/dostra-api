@@ -1,131 +1,409 @@
-# Dostra CRM Lead Ingestion API
+<div align="center">
 
-Dostra-API is a API-only Laravel application for ingesting lead data from WordPress sites through Zapier webhooks.
+<br/>
 
-## Purpose
+```
+██████╗  ██████╗ ███████╗████████╗██████╗  █████╗      █████╗ ██████╗ ██╗
+██╔══██╗██╔═══██╗██╔════╝╚══██╔══╝██╔══██╗██╔══██╗    ██╔══██╗██╔══██╗██║
+██║  ██║██║   ██║███████╗   ██║   ██████╔╝███████║    ███████║██████╔╝██║
+██║  ██║██║   ██║╚════██║   ██║   ██╔══██╗██╔══██║    ██╔══██║██╔═══╝ ██║
+██████╔╝╚██████╔╝███████║   ██║   ██║  ██║██║  ██║    ██║  ██║██║     ██║
+╚═════╝  ╚═════╝ ╚══════╝   ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝    ╚═╝  ╚═╝╚═╝     ╚═╝
+```
 
-Each client website sends lead data through Zapier to this API. Dostra-API stores the lead in the database and exposes simple read endpoints for downstream CRM use.
+*Lead ingestion & CRM API backend for the Dostra system*
+
+<br/>
+
+[![Laravel](https://img.shields.io/badge/Laravel_13-FF2D20?style=flat-square&logo=laravel&logoColor=white)](https://laravel.com/)
+[![PHP](https://img.shields.io/badge/PHP_8.3+-777BB4?style=flat-square&logo=php&logoColor=white)](https://www.php.net/)
+[![Sanctum](https://img.shields.io/badge/Sanctum-FF2D20?style=flat-square&logo=laravel&logoColor=white)](https://laravel.com/docs/sanctum)
+[![SQLite](https://img.shields.io/badge/SQLite-003B57?style=flat-square&logo=sqlite&logoColor=white)](https://sqlite.org/)
+[![MySQL](https://img.shields.io/badge/-MySQL-4479A1?style=flat-square&logo=mysql&labelColor=4479A1&logoColor=FFF)](https://www.mysql.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Pest](https://img.shields.io/badge/Pest-blue?style=flat-square)](https://pestphp.com/)
+
+<br/>
+
+</div>
+
+---
+
+## Overview
+
+`dostra-api` is a Laravel 13 REST API with two responsibilities:
+
+1. **Webhook ingestion** — receives signed leads from WordPress/WPForms via Zapier, verifies each request, and stores the lead against the correct client
+2. **CRM backend** — exposes authenticated endpoints powering a role-separated dashboard for admins and client users
+
+> No frontend build pipeline is included. Vite, Tailwind, and starter assets have been removed.
+
+---
+
+## Architecture
+
+### Webhook Flow
+
+```
+WordPress Form  ──▶  Zapier  ──▶  Signed Webhook  ──▶  Laravel API
+                                                              │
+                                                    HMAC verification
+                                                    Client key lookup
+                                                    Idempotency check
+                                                              │
+                                                         leads table
+```
+
+### CRM Access Model
+
+| Role | Clients | Users | Leads |
+|------|---------|-------|-------|
+| `admin` | All | All | All |
+| `client` | Assigned only | — | Assigned clients only |
+
+Access is enforced via Sanctum auth, Laravel policies, and scoped queries.
+
+---
 
 ## Stack
 
-- Laravel 13
-- PHP 8.3+
-- SQLite for local development
-- Pest for testing
+| | |
+|--|--|
+| **Framework** | Laravel 13 |
+| **Runtime** | PHP 8.3+ |
+| **Auth** | Sanctum personal access tokens |
+| **Database** | SQLite *(dev)* · MySQL / PostgreSQL *(prod)* |
+| **Testing** | Pest |
 
-This repository does not include a frontend build pipeline. Vite, Tailwind, and starter frontend assets have been removed.
-
-## Flow
-
-WordPress form submission
--> Zapier webhook
--> Laravel endpoint
--> `leads` table
--> API consumers
+---
 
 ## Setup
 
-1. Install PHP dependencies.
+### 1 — Install dependencies
 
 ```bash
 composer install
 ```
 
-2. Create the environment file and application key.
+### 2 — Environment & app key
 
 ```bash
 cp .env.example .env
 php artisan key:generate
 ```
 
-3. Configure SQLite.
+### 3 — Configure SQLite
 
 ```bash
 touch database/database.sqlite
 ```
 
-Set the following in `.env`:
+Add to `.env`:
 
 ```env
 DB_CONNECTION=sqlite
 DB_DATABASE=database/database.sqlite
 ```
 
-4. Run migrations.
+### 4 — Migrate & seed
 
 ```bash
-php artisan migrate
+php artisan migrate --seed
 ```
 
-5. Start the API server.
+### 5 — Start the server
 
 ```bash
 php artisan serve
 ```
 
-The local server runs at `http://127.0.0.1:8000`.
+API available at `http://127.0.0.1:8000`
 
-## Endpoints
+---
 
-### `POST /webhook/leads`
+## Authentication
 
-Stores an incoming lead.
+### CRM Login
 
-Example payload:
+```http
+POST /api/login
+```
 
 ```json
 {
-  "client_id": "client_1",
+  "email": "admin@example.com",
+  "password": "password"
+}
+```
+
+Returns:
+
+```json
+{
+  "token": "plain-text-token",
+  "user": {
+    "id": 1,
+    "name": "Admin User",
+    "email": "admin@example.com",
+    "role": "admin",
+    "clients": []
+  }
+}
+```
+
+Use the token on all authenticated requests:
+
+```http
+Authorization: Bearer <token>
+Accept: application/json
+```
+
+### Webhook Authentication
+
+Each webhook request must include four headers:
+
+```http
+X-Client-Key:          client_1
+X-Webhook-Id:          evt_abc123
+X-Webhook-Timestamp:   1711770000
+X-Webhook-Signature:   <hmac>
+```
+
+Signature is computed as:
+
+```
+hash_hmac('sha256', <timestamp>.<raw_json_body>, <client_webhook_secret>)
+```
+
+The API additionally enforces timestamp freshness, active client lookup, and idempotency by `X-Webhook-Id`.
+
+---
+
+## Endpoints
+
+### Public
+
+#### `POST /api/webhook/leads`
+
+Ingests a signed lead for the verified client.
+
+<details>
+<summary>Example request & response</summary>
+
+<br/>
+
+**Headers:**
+```text
+X-Client-Key: client_1
+X-Webhook-Id: evt_abc123
+X-Webhook-Timestamp: 1711770000
+X-Webhook-Signature: <hmac>
+```
+
+**Body:**
+```json
+{
   "name": "John Smith",
   "email": "john@example.com",
   "message": "Need a quote"
 }
 ```
 
-### `GET /leads`
+**Response `201`:**
+```json
+{
+  "message": "Lead received successfully",
+  "data": {
+    "id": 1,
+    "client_id": 1,
+    "name": "John Smith",
+    "email": "john@example.com",
+    "message": "Need a quote",
+    "source": "wpforms-zapier",
+    "webhook_event_id": "evt_abc123",
+    "created_at": "2026-03-31T00:00:00.000000Z"
+  }
+}
+```
 
-Returns all leads ordered newest first.
+> Duplicate `X-Webhook-Id` values return the existing lead — no duplicate is created.
 
-### `GET /leads/{lead}`
+</details>
 
-Returns a single lead by its database id.
+---
 
-## CSRF
+### Authenticated CRM
 
-`/webhook/leads` is excluded from CSRF protection in `bootstrap/app.php` so third-party webhook senders can post to it.
+> All endpoints below require `Authorization: Bearer <token>`
+
+#### Session
+
+| Method | Endpoint | Access | Description |
+|--------|----------|--------|-------------|
+| `GET` | `/api/me` | All | Authenticated user + assigned clients |
+| `POST` | `/api/logout` | All | Revoke current token |
+
+#### Clients
+
+| Method | Endpoint | Access | Description |
+|--------|----------|--------|-------------|
+| `GET` | `/api/clients` | Admin: all · Client: assigned | List clients |
+| `POST` | `/api/clients` | Admin | Create a client |
+| `GET` | `/api/clients/{client}` | Admin: any · Client: assigned | Get client |
+| `PUT` | `/api/clients/{client}` | Admin | Update client |
+| `POST` | `/api/clients/{client}/rotate-webhook-secret` | Admin | Rotate webhook secret |
+
+<details>
+<summary>Create client body</summary>
+
+<br/>
+
+```json
+{
+  "name": "Acme Plumbing",
+  "client_key": "acme_plumbing",
+  "is_active": true
+}
+```
+
+</details>
+
+#### Users
+
+| Method | Endpoint | Access | Description |
+|--------|----------|--------|-------------|
+| `GET` | `/api/users` | Admin | All users with client assignments |
+| `POST` | `/api/users` | Admin | Create user |
+| `GET` | `/api/users/{user}` | Admin | Get user |
+| `PUT` | `/api/users/{user}` | Admin | Update user, role, and assignments |
+
+<details>
+<summary>Create user body</summary>
+
+<br/>
+
+```json
+{
+  "name": "Client User",
+  "email": "client@example.com",
+  "password": "password123",
+  "role": "client",
+  "client_ids": [1]
+}
+```
+
+</details>
+
+#### Leads
+
+| Method | Endpoint | Access | Description |
+|--------|----------|--------|-------------|
+| `GET` | `/api/leads` | Admin: all · Client: assigned | Paginated leads |
+| `GET` | `/api/leads/{lead}` | Admin: any · Client: assigned | Get lead |
+
+**Query parameters:**
+
+```text
+/api/leads?per_page=25
+/api/leads?client_id=1
+/api/leads?email=john@example.com
+/api/leads?search=quote
+/api/leads?from=2026-03-01&to=2026-03-31
+```
+
+---
+
+## Rate Limits
+
+| Endpoint | Limit |
+|----------|-------|
+| `POST /api/login` | 5 / minute per email + IP |
+| `POST /api/webhook/leads` | 60 / minute per `X-Client-Key` |
+| Authenticated CRM | 120 / minute per user |
+
+---
+
+## Data Model
+
+```
+┌────────────────┐         ┌──────────────┐       ┌──────────────┐
+│   clients      │         │ client_user  │       │    users     │
+│────────────────│         │──────────────│       │──────────────│
+│ id             │───┐     │ client_id ───┼───┐   │ id           │
+│ name           │   └───▶ │ user_id   ───┼┐  │   │ name         │
+│ client_key     │         └──────────────┘│  └──▶│ email        │
+│ webhook_secret │                         │      │ password     │
+│ is_active      │                         └─────▶│ role         │
+└────────────────┘                                └──────────────┘
+       │
+       │ 1:many
+       ▼
+┌──────────────────┐
+│    leads         │
+│──────────────────│
+│ id               │
+│ client_id        │
+│ name             │
+│ email            │
+│ message          │
+│ source           │
+│ webhook_event_id │
+│ raw_payload      │
+└──────────────────┘
+```
+
+---
+
+## Local Seed Users
+
+| Role | Email | Password |
+|------|-------|----------|
+| Admin | `admin@example.com` | `password` |
+| Client | `client@example.com` | `password` |
+
+At least one seeded client is available for local webhook testing.
+
+---
 
 ## Testing
 
-Run the test suite with:
+Run the full test suite:
 
 ```bash
 php artisan test --compact
 ```
 
-## Lead Schema
+Format PHP files:
 
-| Field | Type | Notes |
-| --- | --- | --- |
-| `id` | integer | Primary key |
-| `client_id` | string | Client identifier |
-| `name` | string nullable | Lead name |
-| `email` | string nullable | Lead email |
-| `message` | text nullable | Lead message |
-| `source` | string nullable | Source label |
-| `raw_payload` | json nullable | Full request payload |
-| `created_at` | datetime | Created timestamp |
-| `updated_at` | datetime | Updated timestamp |
+```bash
+vendor/bin/pint --dirty --format agent
+```
+
+---
 
 ## Current Scope
 
-- Webhook ingestion
-- Lead persistence
-- Raw payload storage
-- Read endpoints for lead retrieval
+```
+✦  Signed Zapier webhook ingestion
+✦  Per-client lead storage
+✦  Webhook idempotency
+✦  Token-based CRM auth (Sanctum)
+✦  Admin / client role separation
+✦  Client management
+✦  User management
+✦  Paginated lead retrieval with filters
+✦  Policy-backed API authorisation
+✦  Rate limiting
+```
 
-## Next Steps
+---
 
-- Add request validation with a form request
-- Add authentication for trusted webhook clients
-- Add filtering or pagination to lead listing
-- Introduce a `clients` table if multi-tenant behavior expands
+## 📄 License
+
+Internal use only. Add a licence file if this becomes public.
+
+---
+
+<div align="center">
+<sub>Built with Laravel · PHP · Sanctum</sub>
+</div>
