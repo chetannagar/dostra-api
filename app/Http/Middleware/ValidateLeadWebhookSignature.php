@@ -17,10 +17,11 @@ class ValidateLeadWebhookSignature
     public function handle(Request $request, Closure $next): Response
     {
         $clientKey = $request->header('X-Client-Key');
+        $eventId = $request->header('X-Webhook-Id');
         $signature = $request->header('X-Webhook-Signature');
         $timestamp = $request->header('X-Webhook-Timestamp');
 
-        if (! is_string($clientKey) || ! is_string($signature) || ! is_string($timestamp)) {
+        if (! is_string($clientKey) || ! is_string($eventId) || ! is_string($signature) || ! is_string($timestamp)) {
             abort(401, 'Missing webhook authentication headers.');
         }
 
@@ -50,6 +51,7 @@ class ValidateLeadWebhookSignature
         }
 
         $request->attributes->set('webhookClient', $client);
+        $request->attributes->set('webhookEventId', $eventId);
 
         return $next($request);
     }

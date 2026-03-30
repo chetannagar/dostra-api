@@ -13,6 +13,7 @@ class Lead extends Model
         'email',
         'message',
         'source',
+        'webhook_event_id',
         'raw_payload',
     ];
 
