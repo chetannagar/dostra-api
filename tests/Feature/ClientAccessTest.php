@@ -119,6 +119,137 @@ test('a client user can view an assigned client', function () {
         ->assertJsonPath('data.name', 'Assigned Client');
 });
 
+test('an admin can create a client', function () {
+    $admin = User::factory()->create([
+        'role' => 'admin',
+    ]);
+
+    Sanctum::actingAs($admin);
+
+    $response = $this->postJson('/api/clients', [
+        'name' => 'Created Client',
+        'client_key' => 'created_client',
+        'is_active' => true,
+        'webhook_secret' => 'super-secret-created-client-key-123456',
+    ]);
+
+    $response
+        ->assertCreated()
+        ->assertJsonPath('data.name', 'Created Client')
+        ->assertJsonPath('data.client_key', 'created_client')
+        ->assertJsonPath('data.is_active', true);
+
+    $this->assertDatabaseHas('clients', [
+        'name' => 'Created Client',
+        'client_key' => 'created_client',
+        'is_active' => true,
+    ]);
+});
+
+test('an admin can create a client with an auto generated webhook secret', function () {
+    $admin = User::factory()->create([
+        'role' => 'admin',
+    ]);
+
+    Sanctum::actingAs($admin);
+
+    $response = $this->postJson('/api/clients', [
+        'name' => 'Generated Secret Client',
+        'client_key' => 'generated_secret_client',
+    ]);
+
+    $response
+        ->assertCreated()
+        ->assertJsonPath('data.name', 'Generated Secret Client')
+        ->assertJsonPath('data.client_key', 'generated_secret_client')
+        ->assertJsonPath('data.is_active', true);
+
+    $client = Client::query()
+        ->where('client_key', 'generated_secret_client')
+        ->firstOrFail();
+
+    expect(strlen($client->webhook_secret))->toBe(64);
+});
+
+test('an admin can update a client', function () {
+    $admin = User::factory()->create([
+        'role' => 'admin',
+    ]);
+
+    $client = Client::factory()->create([
+        'name' => 'Old Client',
+        'client_key' => 'old_client',
+        'is_active' => true,
+    ]);
+
+    Sanctum::actingAs($admin);
+
+    $response = $this->putJson("/api/clients/{$client->id}", [
+        'name' => 'Updated Client',
+        'client_key' => 'updated_client',
+        'is_active' => false,
+    ]);
+
+    $response
+        ->assertOk()
+        ->assertJsonPath('data.name', 'Updated Client')
+        ->assertJsonPath('data.client_key', 'updated_client')
+        ->assertJsonPath('data.is_active', false);
+
+    $this->assertDatabaseHas('clients', [
+        'id' => $client->id,
+        'name' => 'Updated Client',
+        'client_key' => 'updated_client',
+        'is_active' => false,
+    ]);
+});
+
+test('an admin can update a clients webhook secret', function () {
+    $admin = User::factory()->create([
+        'role' => 'admin',
+    ]);
+
+    $client = Client::factory()->create([
+        'webhook_secret' => 'old-secret-value-12345678901234567890',
+    ]);
+
+    Sanctum::actingAs($admin);
+
+    $this->putJson("/api/clients/{$client->id}", [
+        'webhook_secret' => 'new-secret-value-12345678901234567890',
+    ])->assertOk();
+
+    expect($client->fresh()->webhook_secret)
+        ->toBe('new-secret-value-12345678901234567890');
+});
+
+test('a client user cannot create a client', function () {
+    $clientUser = User::factory()->create([
+        'role' => 'client',
+    ]);
+
+    Sanctum::actingAs($clientUser);
+
+    $this->postJson('/api/clients', [
+        'name' => 'Blocked Client',
+        'client_key' => 'blocked_client',
+    ])->assertForbidden();
+});
+
+test('a client user cannot update another client', function () {
+    $clientUser = User::factory()->create([
+        'role' => 'client',
+    ]);
+
+    $client = Client::factory()->create();
+
+    Sanctum::actingAs($clientUser);
+
+    $this->putJson("/api/clients/{$client->id}", [
+        'name' => 'Blocked Update',
+    ])->assertForbidden();
+});
+
 test('a client user cannot view another client', function () {
     $clientUser = User::factory()->create([
         'role' => 'client',
@@ -143,4 +274,13 @@ test('an unauthenticated user cannot access client endpoints', function () {
 
     $this->getJson("/api/clients/{$client->id}")
         ->assertUnauthorized();
+
+    $this->postJson('/api/clients', [
+        'name' => 'Blocked Client',
+        'client_key' => 'blocked_client',
+    ])->assertUnauthorized();
+
+    $this->putJson("/api/clients/{$client->id}", [
+        'name' => 'Blocked Update',
+    ])->assertUnauthorized();
 });
