@@ -34,7 +34,7 @@ class UpdateUserRequest extends FormRequest
                 Rule::unique('users', 'email')->ignore($user),
             ],
             'password' => ['sometimes', 'string', 'min:8'],
-            'role' => ['sometimes', 'in:admin,client'],
+            'role' => ['sometimes', 'in:super_admin,admin,client'],
             'client_ids' => ['sometimes', 'array'],
             'client_ids.*' => ['integer', 'exists:clients,id'],
         ];

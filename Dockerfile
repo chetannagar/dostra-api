@@ -14,17 +14,33 @@ FROM php:8.4-cli
 # Application path inside the container.
 WORKDIR /var/www/html
 
-# Install system packages and PHP extensions required by this Laravel app.
+# Install system packages and PHP extensions required by this Laravel + Filament app.
 # - git/unzip: needed by Composer packages
+# - libicu-dev: required for intl
+# - libonig-dev: required for mbstring
 # - libsqlite3-dev: required for pdo_sqlite
+# - libxml2-dev: required for dom/xml
+# - libzip-dev: required for zip
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         git \
         unzip \
+        libicu-dev \
+        libonig-dev \
         libsqlite3-dev \
+        libxml2-dev \
+        libzip-dev \
     && docker-php-ext-install \
+        bcmath \
+        dom \
+        exif \
+        intl \
+        mbstring \
+        pcntl \
         pdo \
         pdo_sqlite \
+        xml \
+        zip \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy Composer from the official Composer image so we do not need to install it manually.

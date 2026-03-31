@@ -37,7 +37,7 @@ class ClientSeeder extends Seeder
             [
                 'name' => 'Admin User',
                 'password' => 'password',
-                'role' => 'admin',
+                'role' => 'super_admin',
             ],
         );
 
