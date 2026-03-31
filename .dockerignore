@@ -1,0 +1,50 @@
+# Git
+.git
+.gitmodules
+.gitignore
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# PHP / Composer
+vendor
+
+# Node
+node_modules
+npm-debug.log
+yarn-error.log
+
+# Logs
+*.log
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.codex
+.vscode
+.idea
+
+# Build artifacts
+dist
+build
+
+# Temp files
+tmp
+temp
+
+# Docker
+docker-compose.yml
+docker-compose.override.yml
+
+# Scripts (if not needed in container)
+scripts/
+
+# Laravel runtime artifacts
+storage/logs
+bootstrap/cache/*.php
+
+# Tests (optional)
+tests/
+coverage/

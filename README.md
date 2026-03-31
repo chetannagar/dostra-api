@@ -16,7 +16,7 @@
 <br/>
 
 [![Laravel](https://img.shields.io/badge/Laravel_13-FF2D20?style=flat-square&logo=laravel&logoColor=white)](https://laravel.com/)
-[![PHP](https://img.shields.io/badge/PHP_8.3+-777BB4?style=flat-square&logo=php&logoColor=white)](https://www.php.net/)
+[![PHP](https://img.shields.io/badge/PHP_8.4+-777BB4?style=flat-square&logo=php&logoColor=white)](https://www.php.net/)
 [![Sanctum](https://img.shields.io/badge/Sanctum-FF2D20?style=flat-square&logo=laravel&logoColor=white)](https://laravel.com/docs/sanctum)
 [![SQLite](https://img.shields.io/badge/SQLite-003B57?style=flat-square&logo=sqlite&logoColor=white)](https://sqlite.org/)
 [![MySQL](https://img.shields.io/badge/-MySQL-4479A1?style=flat-square&logo=mysql&labelColor=4479A1&logoColor=FFF)](https://www.mysql.com/)
@@ -70,7 +70,7 @@ Access is enforced via Sanctum auth, Laravel policies, and scoped queries.
 | | |
 |--|--|
 | **Framework** | Laravel 13 |
-| **Runtime** | PHP 8.3+ |
+| **Runtime** | PHP 8.4+ |
 | **Auth** | Sanctum personal access tokens |
 | **Database** | SQLite *(dev)* · MySQL / PostgreSQL *(prod)* |
 | **Testing** | Pest |

@@ -9,7 +9,7 @@
 #
 # For production, use a separate Dockerfile or deployment pipeline.
 
-FROM php:8.3-cli
+FROM php:8.4-cli
 
 # Application path inside the container.
 WORKDIR /var/www/html
