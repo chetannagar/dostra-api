@@ -1,11 +1,15 @@
 {
     "agents": [
-        "copilot"
+        "copilot",
+        "codex"
     ],
     "guidelines": true,
     "herd_mcp": false,
     "mcp": true,
     "nightwatch_mcp": false,
+    "packages": [
+        "filament/filament"
+    ],
     "sail": false,
     "skills": [
         "pest-testing"
