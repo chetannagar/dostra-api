@@ -104,7 +104,7 @@ class UserController extends Controller
      */
     protected function syncUserClients(User $user, array $validated): void
     {
-        if (in_array($user->role, ['admin', 'super_admin'], true)) {
+        if (in_array($user->role, ['admin', 'super_user'], true)) {
             $user->clients()->sync([]);
 
             return;

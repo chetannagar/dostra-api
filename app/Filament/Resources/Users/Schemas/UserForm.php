@@ -37,7 +37,7 @@ class UserForm
                         Select::make('role')
                             ->required()
                             ->options([
-                                'super_admin' => 'Super Admin',
+                                'super_user' => 'Super User',
                                 'admin' => 'Admin',
                                 'client' => 'Client',
                             ])

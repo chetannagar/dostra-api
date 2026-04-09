@@ -39,7 +39,7 @@ class User extends Authenticatable implements FilamentUser
      */
     public function isSuperAdmin(): bool
     {
-        return $this->role === 'super_admin';
+        return $this->role === 'super_user';
     }
 
     /**
@@ -55,7 +55,7 @@ class User extends Authenticatable implements FilamentUser
      */
     public function isAdmin(): bool
     {
-        return in_array($this->role, ['admin', 'super_admin'], true);
+        return in_array($this->role, ['admin', 'super_user'], true);
     }
 
     /**

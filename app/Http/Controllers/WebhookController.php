@@ -10,6 +10,12 @@ use Illuminate\Http\JsonResponse;
 
 class WebhookController extends Controller
 {
+    /**
+     * Handle incoming lead webhook requests.
+     *
+     * @param StoreLeadWebhookRequest $request
+     * @return JsonResponse
+     */
     public function store(StoreLeadWebhookRequest $request): JsonResponse
     {
         /** @var Client $client */

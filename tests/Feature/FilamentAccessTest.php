@@ -10,9 +10,9 @@ test('a guest is redirected to the filament login page', function () {
         ->assertRedirect('/admin/login');
 });
 
-test('a super admin can access the filament admin panel', function () {
+test('a super user can access the filament admin panel', function () {
     $user = User::factory()->create([
-        'role' => 'super_admin',
+        'role' => 'super_user',
     ]);
 
     $this->actingAs($user)

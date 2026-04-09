@@ -33,11 +33,20 @@ class ClientSeeder extends Seeder
         );
 
         User::query()->updateOrCreate(
+            ['email' => 'superuser@example.com'],
+            [
+                'name' => 'Super User',
+                'password' => 'password',
+                'role' => 'super_user',
+            ],
+        );
+
+        User::query()->updateOrCreate(
             ['email' => 'admin@example.com'],
             [
                 'name' => 'Admin User',
                 'password' => 'password',
-                'role' => 'super_admin',
+                'role' => 'admin',
             ],
         );
 

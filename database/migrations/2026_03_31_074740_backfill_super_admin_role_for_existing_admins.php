@@ -11,7 +11,7 @@ return new class extends Migration
     {
         DB::table('users')
             ->where('role', 'admin')
-            ->update(['role' => 'super_admin']);
+            ->update(['role' => 'super_user']);
     }
 
     /**
@@ -20,7 +20,7 @@ return new class extends Migration
     public function down(): void
     {
         DB::table('users')
-            ->where('role', 'super_admin')
+            ->where('role', 'super_user')
             ->update(['role' => 'admin']);
     }
 };
