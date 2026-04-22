@@ -16,7 +16,8 @@
 <br/>
 
 [![Laravel](https://img.shields.io/badge/Laravel_13-FF2D20?style=flat-square&logo=laravel&logoColor=white)](https://laravel.com/)
-[![PHP](https://img.shields.io/badge/PHP_8.4+-777BB4?style=flat-square&logo=php&logoColor=white)](https://www.php.net/)
+[![PHP](https://img.shields.io/badge/PHP_8.5+-777BB4?style=flat-square&logo=php&logoColor=white)](https://www.php.net/)
+[![Filament](https://img.shields.io/badge/Filament_v5-FDAE4B?style=flat-square&logo=laravel&logoColor=white)](https://filamentphp.com/)
 [![Sanctum](https://img.shields.io/badge/Sanctum-FF2D20?style=flat-square&logo=laravel&logoColor=white)](https://laravel.com/docs/sanctum)
 [![SQLite](https://img.shields.io/badge/SQLite-003B57?style=flat-square&logo=sqlite&logoColor=white)](https://sqlite.org/)
 [![MySQL](https://img.shields.io/badge/-MySQL-4479A1?style=flat-square&logo=mysql&labelColor=4479A1&logoColor=FFF)](https://www.mysql.com/)
@@ -56,10 +57,13 @@ WordPress Form  ──▶  Zapier  ──▶  Signed Webhook  ──▶  Laravel
 
 ### CRM Access Model
 
-| Role | Clients | Users | Leads |
-|------|---------|-------|-------|
-| `admin` | All | All | All |
-| `client` | Assigned only | — | Assigned clients only |
+| Role | Clients | Users | Leads | Admin Panel |
+|------|---------|-------|-------|-------------|
+| `super_user` | All | All | All | ✓ (Filament) |
+| `admin` | All | All | All | — |
+| `client` | Assigned only | — | Assigned clients only | — |
+
+`super_user` and `admin` are both treated as admin in the API (`isAdmin()` returns true for both). Only `super_user` can access the Filament panel at `/admin`.
 
 Access is enforced via Sanctum auth, Laravel policies, and scoped queries.
 
@@ -70,8 +74,9 @@ Access is enforced via Sanctum auth, Laravel policies, and scoped queries.
 | | |
 |--|--|
 | **Framework** | Laravel 13 |
-| **Runtime** | PHP 8.4+ |
+| **Runtime** | PHP 8.5+ |
 | **Auth** | Sanctum personal access tokens |
+| **Admin Panel** | Filament v5 (`/admin`, `super_user` only) |
 | **Database** | SQLite *(dev)* · MySQL / PostgreSQL *(prod)* |
 | **Testing** | Pest |
 
@@ -262,9 +267,14 @@ X-Webhook-Signature: <hmac>
 {
   "name": "Acme Plumbing",
   "client_key": "acme_plumbing",
+  "webhook_secret": "optional-min-32-chars",
   "is_active": true
 }
 ```
+
+`client_key` and `webhook_secret` are optional — auto-generated if omitted. Auto-generated `client_key` uses the format `wp_{normalized_name}` (e.g. `wp_acme_plumbing`). Auto-generated `webhook_secret` is a 64-character random string.
+
+> `webhook_secret` is **not** returned in GET responses. Use `POST /api/clients/{client}/rotate-webhook-secret` to retrieve or reset it.
 
 </details>
 
@@ -291,6 +301,8 @@ X-Webhook-Signature: <hmac>
   "client_ids": [1]
 }
 ```
+
+Valid roles: `super_user`, `admin`, `client`. `client_ids` assigns clients to the user (required for `client` role).
 
 </details>
 
@@ -358,10 +370,12 @@ X-Webhook-Signature: <hmac>
 
 | Role | Email | Password |
 |------|-------|----------|
-| Admin | `admin@example.com` | `password` |
-| Client | `client@example.com` | `password` |
+| `super_user` | `superuser@example.com` | `password` |
+| `admin` | `admin@example.com` | `password` |
+| `client` | `client@example.com` | `password` |
+| `client` | `client2@example.com` | `password` |
 
-At least one seeded client is available for local webhook testing.
+Two seeded clients (`client_1`, `client_2`) are available for local webhook testing. `client@example.com` is assigned to `client_1`; `client2@example.com` to `client_2`.
 
 ---
 
@@ -388,8 +402,9 @@ vendor/bin/pint --dirty --format agent
 ✦  Per-client lead storage
 ✦  Webhook idempotency
 ✦  Token-based CRM auth (Sanctum)
-✦  Admin / client role separation
-✦  Client management
+✦  Three-tier role system (super_user / admin / client)
+✦  Filament admin panel (/admin, super_user only)
+✦  Client management with auto-generated keys and secrets
 ✦  User management
 ✦  Paginated lead retrieval with filters
 ✦  Policy-backed API authorisation
