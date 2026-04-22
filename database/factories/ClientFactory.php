@@ -20,7 +20,7 @@ class ClientFactory extends Factory
     {
         return [
             'name' => fake()->company(),
-            'client_key' => 'client_'.Str::lower(Str::random(10)),
+            'client_key' => 'wp_'.Str::lower(Str::random(10)),
             'webhook_secret' => Str::random(64),
             'is_active' => true,
         ];

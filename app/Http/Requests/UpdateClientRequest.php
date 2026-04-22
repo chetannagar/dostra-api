@@ -26,7 +26,12 @@ class UpdateClientRequest extends FormRequest
         $client = $this->route('client');
 
         return [
-            'name' => ['sometimes', 'string', 'max:255'],
+            'name' => [
+                'sometimes',
+                'string',
+                'max:255',
+                Rule::unique('clients', 'name')->ignore($client),
+            ],
             'client_key' => [
                 'sometimes',
                 'string',

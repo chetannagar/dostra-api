@@ -171,6 +171,48 @@ test('an admin can create a client with an auto generated webhook secret', funct
     expect(strlen($client->webhook_secret))->toBe(64);
 });
 
+test('an admin can create a client with an auto generated client key from the name', function () {
+    $admin = User::factory()->create([
+        'role' => 'admin',
+    ]);
+
+    Sanctum::actingAs($admin);
+
+    $response = $this->postJson('/api/clients', [
+        'name' => 'Bright Dental Group',
+    ]);
+
+    $response
+        ->assertCreated()
+        ->assertJsonPath('data.name', 'Bright Dental Group')
+        ->assertJsonPath('data.client_key', 'wp_bright_dental_group')
+        ->assertJsonPath('data.is_active', true);
+
+    $this->assertDatabaseHas('clients', [
+        'name' => 'Bright Dental Group',
+        'client_key' => 'wp_bright_dental_group',
+    ]);
+});
+
+test('an admin cannot create two clients with the same name', function () {
+    $admin = User::factory()->create([
+        'role' => 'admin',
+    ]);
+
+    Client::factory()->create([
+        'name' => 'Duplicate Client',
+        'client_key' => 'wp_duplicate_client',
+    ]);
+
+    Sanctum::actingAs($admin);
+
+    $this->postJson('/api/clients', [
+        'name' => 'Duplicate Client',
+        'client_key' => 'wp_duplicate_client_two',
+        'webhook_secret' => 'super-secret-created-client-key-duplicate',
+    ])->assertStatus(422);
+});
+
 test('an admin can update a client', function () {
     $admin = User::factory()->create([
         'role' => 'admin',

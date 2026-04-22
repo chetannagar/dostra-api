@@ -23,8 +23,8 @@ class StoreClientRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => ['required', 'string', 'max:255'],
-            'client_key' => ['required', 'string', 'max:255', 'unique:clients,client_key'],
+            'name' => ['required', 'string', 'max:255', 'unique:clients,name'],
+            'client_key' => ['sometimes', 'string', 'max:255', 'unique:clients,client_key'],
             'is_active' => ['sometimes', 'boolean'],
             'webhook_secret' => ['sometimes', 'string', 'min:32'],
         ];

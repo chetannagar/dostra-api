@@ -7,7 +7,6 @@ use App\Http\Requests\UpdateClientRequest;
 use App\Http\Resources\ClientResource;
 use App\Models\Client;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Illuminate\Support\Str;
 
 class ClientController extends Controller
 {
@@ -38,8 +37,8 @@ class ClientController extends Controller
 
         $client = Client::query()->create([
             'name' => $validated['name'],
-            'client_key' => $validated['client_key'],
-            'webhook_secret' => $validated['webhook_secret'] ?? Str::random(64),
+            'client_key' => $validated['client_key'] ?? Client::generateClientKey($validated['name']),
+            'webhook_secret' => $validated['webhook_secret'] ?? Client::generateWebhookSecret(),
             'is_active' => $validated['is_active'] ?? true,
         ]);
 

@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
 class Client extends Model
 {
@@ -35,5 +36,21 @@ class Client extends Model
     public function users(): BelongsToMany
     {
         return $this->belongsToMany(User::class)->withTimestamps();
+    }
+
+    public static function generateClientKey(string $name): string
+    {
+        $normalizedName = Str::of($name)
+            ->lower()
+            ->replaceMatches('/[^a-z0-9]+/', '_')
+            ->trim('_')
+            ->toString();
+
+        return "wp_{$normalizedName}";
+    }
+
+    public static function generateWebhookSecret(): string
+    {
+        return Str::random(64);
     }
 }
