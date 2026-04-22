@@ -10,7 +10,7 @@
 # - source is copied into the image — no bind mounts in production
 # - config cache + migrations run at container startup via CMD
 
-FROM php:8.4-fpm
+FROM php:8.4-fpm-alpine
 
 # Application path inside the container.
 WORKDIR /var/www/html
@@ -22,13 +22,12 @@ WORKDIR /var/www/html
 # - libpq-dev: required for pdo_pgsql
 # - libxml2-dev: required for dom/xml
 # - libzip-dev: required for zip
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
+RUN apk add --no-cache \
         git \
         unzip \
-        libicu-dev \
-        libonig-dev \
-        libpq-dev \
+        icu-dev \
+        oniguruma-dev \
+        postgresql-dev \
         libxml2-dev \
         libzip-dev \
     && docker-php-ext-install \
@@ -41,8 +40,7 @@ RUN apt-get update \
         pdo \
         pdo_pgsql \
         xml \
-        zip \
-    && rm -rf /var/lib/apt/lists/*
+        zip
 
 # Copy Composer from the official image.
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
