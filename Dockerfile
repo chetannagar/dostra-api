@@ -1,10 +1,9 @@
 # Development-only Dockerfile for the Laravel API.
 #
 # This image is intentionally optimized for local development:
-# - uses SQLite
+# - uses PostgreSQL
 # - keeps dev Composer dependencies
 # - runs `php artisan serve` instead of Apache
-# - auto-creates the SQLite file if it does not exist
 # - runs migrations on startup for convenience
 #
 # For production, use a separate Dockerfile or deployment pipeline.
@@ -18,7 +17,7 @@ WORKDIR /var/www/html
 # - git/unzip: needed by Composer packages
 # - libicu-dev: required for intl
 # - libonig-dev: required for mbstring
-# - libsqlite3-dev: required for pdo_sqlite
+# - libpq-dev: required for pdo_pgsql
 # - libxml2-dev: required for dom/xml
 # - libzip-dev: required for zip
 RUN apt-get update \
@@ -27,7 +26,7 @@ RUN apt-get update \
         unzip \
         libicu-dev \
         libonig-dev \
-        libsqlite3-dev \
+        libpq-dev \
         libxml2-dev \
         libzip-dev \
     && docker-php-ext-install \
@@ -38,7 +37,7 @@ RUN apt-get update \
         mbstring \
         pcntl \
         pdo \
-        pdo_sqlite \
+        pdo_pgsql \
         xml \
         zip \
     && rm -rf /var/lib/apt/lists/*
@@ -55,22 +54,19 @@ RUN composer install \
     --no-progress \
     --prefer-dist
 
-# Prepare Laravel writable directories and the local SQLite database file.
+# Prepare Laravel writable directories.
 RUN mkdir -p \
-        database \
         storage/framework/cache \
         storage/framework/sessions \
         storage/framework/views \
         storage/logs \
         bootstrap/cache \
-    && touch database/database.sqlite \
-    && chmod -R ug+rwx storage bootstrap/cache database
+    && chmod -R ug+rwx storage bootstrap/cache
 
 # Laravel's development server will listen on port 8000.
 EXPOSE 8000
 
 # Start the app in development mode.
-# - ensure the SQLite file exists
 # - run migrations automatically for local convenience
 # - serve the app on all interfaces so Docker port mapping works
-CMD sh -c "touch database/database.sqlite && php artisan migrate --force && php artisan serve --host=0.0.0.0 --port=8000"
+CMD ["sh", "-c", "php artisan config:cache && php artisan migrate --force && php artisan db:seed --force && php artisan serve --host=0.0.0.0 --port=8000"]
