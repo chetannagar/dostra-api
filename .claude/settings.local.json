@@ -3,7 +3,13 @@
     "allow": [
       "mcp__laravel-boost__search-docs",
       "Bash(vendor/bin/pint --dirty --format agent)",
-      "Bash(php artisan *)"
+      "Bash(php artisan *)",
+      "mcp__laravel-boost__last-error",
+      "mcp__laravel-boost__read-log-entries",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://127.0.0.1:8000/api/webhook/leads -X POST -H \"Content-Type: application/json\" -H \"X-Client-Key: test\" -H \"X-Webhook-Id: test\" -H \"X-Webhook-Signature: test\" -H \"X-Webhook-Timestamp: 9999\" -d '{}')",
+      "Bash(curl -s http://localhost:2000/metrics)",
+      "Bash(curl -s http://localhost:2000/healthcheck)",
+      "Bash(curl -s http://127.0.0.1:8080/metrics)"
     ]
   }
 }
