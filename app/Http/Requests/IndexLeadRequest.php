@@ -24,7 +24,7 @@ class IndexLeadRequest extends FormRequest
     {
         return [
             'client_id' => ['sometimes', 'integer', 'exists:clients,id'],
-            'email' => ['sometimes', 'email'],
+            'email' => ['sometimes', 'string', 'max:255'],
             'search' => ['sometimes', 'string', 'max:255'],
             'from' => ['sometimes', 'date'],
             'to' => ['sometimes', 'date', 'after_or_equal:from'],
