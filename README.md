@@ -11,143 +11,173 @@
 ╚═════╝  ╚═════╝ ╚══════╝   ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝    ╚═╝  ╚═╝╚═╝     ╚═╝
 ```
 
-*Lead ingestion & CRM API backend for the Dostra system*
+*Lead ingestion, CRM REST API and admin panel for the Dostra system*
 
 <br/>
 
 [![Laravel](https://img.shields.io/badge/Laravel_13-FF2D20?style=flat-square&logo=laravel&logoColor=white)](https://laravel.com/)
-[![PHP](https://img.shields.io/badge/PHP_8.5+-777BB4?style=flat-square&logo=php&logoColor=white)](https://www.php.net/)
+[![PHP](https://img.shields.io/badge/PHP_8.5.12+-777BB4?style=flat-square&logo=php&logoColor=white)](https://www.php.net/)
 [![Filament](https://img.shields.io/badge/Filament_v5-FDAE4B?style=flat-square&logo=laravel&logoColor=white)](https://filamentphp.com/)
 [![Sanctum](https://img.shields.io/badge/Sanctum-FF2D20?style=flat-square&logo=laravel&logoColor=white)](https://laravel.com/docs/sanctum)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=flat-square&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![SQLite](https://img.shields.io/badge/SQLite-003B57?style=flat-square&logo=sqlite&logoColor=white)](https://sqlite.org/)
-[![MySQL](https://img.shields.io/badge/-MySQL-4479A1?style=flat-square&logo=mysql&labelColor=4479A1&logoColor=FFF)](https://www.mysql.com/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
-[![Pest](https://img.shields.io/badge/Pest-blue?style=flat-square)](https://pestphp.com/)
+[![Pest](https://img.shields.io/badge/Pest_4-F472B6?style=flat-square)](https://pestphp.com/)
 
 <br/>
+
+[Overview](#-overview) ·
+[Quick start](#-quick-start) ·
+[Auth](#-authentication) ·
+[Endpoints](#-endpoints) ·
+[Data model](#-data-model) ·
+[Testing](#-testing) ·
+[Production](#-production)
 
 </div>
 
 ---
 
-## Overview
+## ✨ Overview
 
-`dostra-api` is a Laravel 13 REST API with two responsibilities:
+`dostra-api` is the Laravel 13 backend for Dostra. It does two jobs:
 
-1. **Webhook ingestion** — receives signed leads from WordPress/WPForms via Zapier, verifies each request, and stores the lead against the correct client
-2. **CRM backend** — exposes authenticated endpoints powering a role-separated dashboard for admins and client users
+1. **📥 Webhook ingestion.** Receives HMAC-signed leads from WordPress/WPForms via Zapier, verifies every request, and stores the lead under the right client.
+2. **📊 CRM backend.** Serves a token-authenticated REST API to the [`dostra-web`](https://github.com/chetannagar/dostra-web) dashboard, plus a Filament admin panel for super users.
 
-> No frontend build pipeline is included. Vite, Tailwind, and starter assets have been removed.
+It is API-only. There is no frontend build pipeline here.
 
----
+> This service is normally run through [`dostra-deploy`](https://github.com/chetannagar/dostra-deploy), which wires it to the frontend, PostgreSQL and Nginx.
 
-## Architecture
-
-### Webhook Flow
-
-```
-WordPress Form  ──▶  Zapier  ──▶  Signed Webhook  ──▶  Laravel API
-                                                              │
-                                                    HMAC verification
-                                                    Client key lookup
-                                                    Idempotency check
-                                                              │
-                                                         leads table
+```mermaid
+flowchart LR
+    WP["WordPress<br/>form"] --> Z["Zapier"]
+    Z -- "signed webhook" --> W["POST /api/webhook/leads"]
+    W --> DB[("Database")]
+    WEB["dostra-web"] -- "Bearer token" --> CRM["CRM REST API"]
+    CRM --> DB
+    SU["Super user"] --> F["Filament /admin"]
+    F --> DB
 ```
 
-### CRM Access Model
+---
 
-| Role | Clients | Users | Leads | Admin Panel |
-|------|---------|-------|-------|-------------|
-| `super_user` | All | All | All | ✓ (Filament) |
-| `admin` | All | All | All | — |
-| `client` | Assigned only | — | Assigned clients only | — |
+## 🔐 Access model
 
-`super_user` and `admin` are both treated as admin in the API (`isAdmin()` returns true for both). Only `super_user` can access the Filament panel at `/admin`.
+| Role | Clients | Users | Leads | Filament `/admin` |
+|------|---------|-------|-------|:-----------------:|
+| `super_user` | All (create, edit) | All (create, edit) | All | ✅ |
+| `admin` | All (create, edit) | All (create, edit) | All | ❌ |
+| `client` | Assigned only (read) | ❌ | Assigned clients only (read) | ❌ |
 
-Access is enforced via Sanctum auth, Laravel policies, and scoped queries.
+- `super_user` and `admin` are both treated as admin by the API (`User::isAdmin()`). Only `super_user` passes `canAccessPanel()` for Filament.
+- Admin-level users are never assigned clients. Saving one clears its assignments.
+- Enforced in three layers: Sanctum auth, Laravel Policies, and scoped Eloquent queries.
+- Leads are read-only through the API. They are created only by the webhook.
 
 ---
 
-## Stack
+## 🚀 Quick start
 
-| | |
-|--|--|
-| **Framework** | Laravel 13 |
-| **Runtime** | PHP 8.5+ |
-| **Auth** | Sanctum personal access tokens |
-| **Admin Panel** | Filament v5 (`/admin`, `super_user` only) |
-| **Database** | SQLite *(dev)* · MySQL / PostgreSQL *(prod)* |
-| **Testing** | Pest |
+### With Docker (recommended)
 
----
+Use the deploy repo. It starts the API with PostgreSQL and the frontend, with hot reload:
 
-## Setup
+```bash
+cd ..                        # dostra-deploy root
+./scripts/docker-deploy.sh   # API on http://127.0.0.1:8000
+```
 
-### 1 — Install dependencies
+### Without Docker
+
+You need **PHP 8.5.12+** (or 8.4.27+) with the `intl`, `zip`, `bcmath` and database extensions, plus Composer.
 
 ```bash
 composer install
-```
-
-### 2 — Environment & app key
-
-```bash
 cp .env.example .env
 php artisan key:generate
 ```
 
-### 3 — Configure SQLite
+Then pick a database in `.env`.
+
+<details>
+<summary><strong>Option A: SQLite (zero setup)</strong></summary>
+
+<br/>
 
 ```bash
 touch database/database.sqlite
 ```
-
-Add to `.env`:
 
 ```env
 DB_CONNECTION=sqlite
 DB_DATABASE=database/database.sqlite
 ```
 
-### 4 — Migrate & seed
+</details>
+
+<details>
+<summary><strong>Option B: PostgreSQL (the default in <code>.env.example</code>)</strong></summary>
+
+<br/>
+
+```env
+DB_CONNECTION=pgsql
+DB_HOST=localhost
+DB_PORT=5432
+DB_DATABASE=dostra_test_db
+DB_USERNAME=your_username
+DB_PASSWORD=your_password
+```
+
+</details>
+
+Then migrate, seed and serve:
 
 ```bash
 php artisan migrate --seed
+php artisan serve            # or: composer run dev
 ```
 
-### 5 — Start the server
+API: `http://127.0.0.1:8000` · Admin panel: `http://127.0.0.1:8000/admin` · Health check: `/up`
 
-```bash
-php artisan serve
-```
+### 🌱 Seed data (local only)
 
-API available at `http://127.0.0.1:8000`
+| Role | Email | Password |
+|------|-------|----------|
+| `super_user` | `superuser@example.com` | `password` |
+| `admin` | `admin@example.com` | `password` |
+| `client` | `client@example.com` | `password` (assigned to `client_1`) |
+| `client` | `client2@example.com` | `password` (assigned to `client_2`) |
+
+Two clients are seeded for webhook testing:
+
+| `client_key` | `webhook_secret` |
+|--------------|------------------|
+| `client_1` | `super-secret-test-key-123` |
+| `client_2` | `super-secret-test-key-456` |
+
+> ⚠️ **Never seed these in production.** Production creates users by hand. See [Production](#-production).
 
 ---
 
-## Authentication
+## 🔑 Authentication
 
-### CRM Login
+### CRM login (Sanctum personal access tokens)
 
 ```http
 POST /api/login
+Content-Type: application/json
 ```
 
 ```json
-{
-  "email": "admin@example.com",
-  "password": "password"
-}
+{ "email": "admin@example.com", "password": "password" }
 ```
-
-Returns:
 
 ```json
 {
   "token": "plain-text-token",
   "user": {
-    "id": 1,
+    "id": 2,
     "name": "Admin User",
     "email": "admin@example.com",
     "role": "admin",
@@ -156,56 +186,67 @@ Returns:
 }
 ```
 
-Use the token on all authenticated requests:
+Send the token on every other request:
 
 ```http
 Authorization: Bearer <token>
 Accept: application/json
 ```
 
-### Webhook Authentication
+| Status | Meaning |
+|--------|---------|
+| `422` | Wrong credentials (`Invalid credentials.`) or malformed input |
+| `429` | More than 5 attempts a minute for this email + IP |
+| `401` | Missing, invalid or revoked token on a protected route |
 
-Each webhook request must include four headers:
+### Webhook signing (Zapier → API)
+
+Webhook calls don't use bearer tokens. Each request carries four headers and an HMAC signature:
 
 ```http
-X-Client-Key:          client_1
-X-Webhook-Id:          evt_abc123
-X-Webhook-Timestamp:   1711770000
-X-Webhook-Signature:   <hmac>
+X-Client-Key:         wp_acme_plumbing
+X-Webhook-Id:         evt_abc123
+X-Webhook-Timestamp:  1711770000
+X-Webhook-Signature:  <hex hmac>
 ```
 
-Signature is computed as:
-
-```
-hash_hmac('sha256', <timestamp>.<raw_json_body>, <client_webhook_secret>)
+```php
+$signature = hash_hmac('sha256', $timestamp.'.'.$rawJsonBody, $client->webhook_secret);
 ```
 
-The API additionally enforces timestamp freshness, active client lookup, and idempotency by `X-Webhook-Id`.
+The middleware (`validate.lead.webhook`) checks, in order:
+
+| # | Check | Failure |
+|---|-------|---------|
+| 1 | All four headers present | `401 Missing webhook authentication headers.` |
+| 2 | Client exists **and is active** | `401 Invalid webhook client.` |
+| 3 | Timestamp is digits only | `401 Invalid webhook timestamp.` |
+| 4 | Timestamp within ±5 minutes | `401 Webhook timestamp is too old.` |
+| 5 | Signature matches (constant-time compare) | `401 Invalid webhook signature.` |
+| 6 | `X-Webhook-Id` not seen before | `200` with the existing lead, nothing created |
+
+The webhook route is exempt from CSRF protection. Full Zapier setup: [`dostra-deploy/docs/ZAPIER-INTEGRATION.md`](https://github.com/chetannagar/dostra-deploy/blob/master/docs/ZAPIER-INTEGRATION.md).
 
 ---
 
-## Endpoints
+## 📡 Endpoints
+
+All routes live under `/api`.
 
 ### Public
 
-#### `POST /api/webhook/leads`
-
-Ingests a signed lead for the verified client.
+| Method | Endpoint | Throttle | Description |
+|--------|----------|----------|-------------|
+| `POST` | `/webhook/leads` | 60/min per client key | Ingest a signed lead |
+| `POST` | `/login` | 5/min per email + IP | Exchange credentials for a token |
 
 <details>
-<summary>Example request & response</summary>
+<summary><strong><code>POST /api/webhook/leads</code> example</strong></summary>
 
 <br/>
 
-**Headers:**
-```text
-X-Client-Key: client_1
-X-Webhook-Id: evt_abc123
-X-Webhook-Timestamp: 1711770000
-X-Webhook-Signature: <hmac>
-```
+**Body** (all fields optional):
 
-**Body:**
 ```json
 {
   "name": "John Smith",
@@ -214,7 +255,14 @@ X-Webhook-Signature: <hmac>
 }
 ```
 
-**Response `201`:**
+| Field | Rules |
+|-------|-------|
+| `name` | string, max 255 |
+| `email` | valid email, max 255 |
+| `message` | string |
+
+**`201 Created`**
+
 ```json
 {
   "message": "Lead received successfully",
@@ -225,56 +273,62 @@ X-Webhook-Signature: <hmac>
     "email": "john@example.com",
     "message": "Need a quote",
     "source": "wpforms-zapier",
-    "webhook_event_id": "evt_abc123",
-    "created_at": "2026-03-31T00:00:00.000000Z"
+    "raw_payload": { "name": "John Smith", "email": "john@example.com", "message": "Need a quote" },
+    "client": { "id": 1, "name": "Client 1", "client_key": "client_1", "is_active": true },
+    "created_at": "2026-03-31T00:00:00.000000Z",
+    "updated_at": "2026-03-31T00:00:00.000000Z"
   }
 }
 ```
 
-> Duplicate `X-Webhook-Id` values return the existing lead — no duplicate is created.
+**`200 OK`** for a repeated `X-Webhook-Id`: the same shape with `"message": "Webhook event already processed."`.
 
 </details>
 
----
-
-### Authenticated CRM
-
-> All endpoints below require `Authorization: Bearer <token>`
+### Authenticated (`auth:sanctum`, 120/min per user)
 
 #### Session
 
 | Method | Endpoint | Access | Description |
 |--------|----------|--------|-------------|
-| `GET` | `/api/me` | All | Authenticated user + assigned clients |
-| `POST` | `/api/logout` | All | Revoke current token |
+| `GET` | `/me` | All | Current user with assigned clients |
+| `POST` | `/logout` | All | Revoke the current token |
 
 #### Clients
 
 | Method | Endpoint | Access | Description |
 |--------|----------|--------|-------------|
-| `GET` | `/api/clients` | Admin: all · Client: assigned | List clients |
-| `POST` | `/api/clients` | Admin | Create a client |
-| `GET` | `/api/clients/{client}` | Admin: any · Client: assigned | Get client |
-| `PUT` | `/api/clients/{client}` | Admin | Update client |
-| `POST` | `/api/clients/{client}/rotate-webhook-secret` | Admin | Rotate webhook secret |
+| `GET` | `/clients` | Admin: all · Client: assigned | List clients |
+| `POST` | `/clients` | Admin | Create a client |
+| `GET` | `/clients/{client}` | Admin: any · Client: assigned | Show a client |
+| `PUT` | `/clients/{client}` | Admin | Update a client |
+| `POST` | `/clients/{client}/rotate-webhook-secret` | Admin | Generate a new secret and return it |
 
 <details>
-<summary>Create client body</summary>
+<summary><strong>Create / update client</strong></summary>
 
 <br/>
 
 ```json
 {
   "name": "Acme Plumbing",
-  "client_key": "acme_plumbing",
-  "webhook_secret": "optional-min-32-chars",
+  "client_key": "wp_acme_plumbing",
+  "webhook_secret": "optional, min 32 chars",
   "is_active": true
 }
 ```
 
-`client_key` and `webhook_secret` are optional — auto-generated if omitted. Auto-generated `client_key` uses the format `wp_{normalized_name}` (e.g. `wp_acme_plumbing`). Auto-generated `webhook_secret` is a 64-character random string.
+- `name` is required on create and must be unique.
+- `client_key` is optional. If omitted it's generated as `wp_{snake_case_name}` (e.g. `wp_acme_plumbing`). It must be unique.
+- `webhook_secret` is optional. If omitted, a 64-character random string is generated.
+- The secret is **never returned** by the client endpoints. The only way to read one is the rotate endpoint, which returns the new value once.
 
-> `webhook_secret` is **not** returned in GET responses. Use `POST /api/clients/{client}/rotate-webhook-secret` to retrieve or reset it.
+```json
+{
+  "message": "Webhook secret rotated successfully.",
+  "data": { "id": 1, "name": "Acme Plumbing", "client_key": "wp_acme_plumbing", "webhook_secret": "…64 chars…" }
+}
+```
 
 </details>
 
@@ -282,13 +336,13 @@ X-Webhook-Signature: <hmac>
 
 | Method | Endpoint | Access | Description |
 |--------|----------|--------|-------------|
-| `GET` | `/api/users` | Admin | All users with client assignments |
-| `POST` | `/api/users` | Admin | Create user |
-| `GET` | `/api/users/{user}` | Admin | Get user |
-| `PUT` | `/api/users/{user}` | Admin | Update user, role, and assignments |
+| `GET` | `/users` | Admin | List users with their clients |
+| `POST` | `/users` | Admin | Create a user |
+| `GET` | `/users/{user}` | Admin | Show a user |
+| `PUT` | `/users/{user}` | Admin | Update a user, role or client assignments |
 
 <details>
-<summary>Create user body</summary>
+<summary><strong>Create / update user</strong></summary>
 
 <br/>
 
@@ -302,7 +356,10 @@ X-Webhook-Signature: <hmac>
 }
 ```
 
-Valid roles: `super_user`, `admin`, `client`. `client_ids` assigns clients to the user (required for `client` role).
+- `role` is one of `super_user`, `admin`, `client`.
+- `password` needs at least 8 characters. `email` must be unique.
+- `client_ids` replaces the user's assigned clients. It's ignored (and cleared) for `admin` and `super_user`.
+- On update every field is optional.
 
 </details>
 
@@ -310,106 +367,168 @@ Valid roles: `super_user`, `admin`, `client`. `client_ids` assigns clients to th
 
 | Method | Endpoint | Access | Description |
 |--------|----------|--------|-------------|
-| `GET` | `/api/leads` | Admin: all · Client: assigned | Paginated leads |
-| `GET` | `/api/leads/{lead}` | Admin: any · Client: assigned | Get lead |
+| `GET` | `/leads` | Admin: all · Client: assigned | Paginated list, newest first |
+| `GET` | `/leads/{lead}` | Admin: any · Client: assigned | Show a lead |
 
-**Query parameters:**
+| Query param | Rule | Effect |
+|-------------|------|--------|
+| `client_id` | existing client id | Only that client's leads |
+| `email` | string | Exact email match |
+| `search` | string, max 255 | Substring match on name, email or message |
+| `from` / `to` | dates, `to ≥ from` | Filter by creation date (inclusive) |
+| `per_page` | 1 to 100 (default 15) | Page size |
+| `page` | integer | Page number |
 
 ```text
-/api/leads?per_page=25
-/api/leads?client_id=1
-/api/leads?email=john@example.com
-/api/leads?search=quote
-/api/leads?from=2026-03-01&to=2026-03-31
+GET /api/leads?client_id=1&search=quote&from=2026-03-01&to=2026-03-31&per_page=25
+```
+
+The response is a Laravel paginated resource collection: `data`, `links` and `meta` (`current_page`, `last_page`, `per_page`, `total`, …).
+
+---
+
+## 🗄 Data model
+
+```mermaid
+erDiagram
+    CLIENTS ||--o{ LEADS : receives
+    CLIENTS }o--o{ USERS : "client_user"
+    CLIENTS {
+        id id PK
+        string name
+        string client_key UK
+        string webhook_secret
+        bool is_active
+    }
+    LEADS {
+        id id PK
+        id client_id FK
+        string name
+        string email
+        text message
+        string source
+        string webhook_event_id UK
+        json raw_payload
+    }
+    USERS {
+        id id PK
+        string name
+        string email UK
+        string password
+        string role
+    }
+```
+
+- Deleting a client cascades to its leads and assignments.
+- `webhook_event_id` is unique, which is what makes ingestion idempotent.
+- `raw_payload` keeps the full JSON body that was received.
+
+---
+
+## 🛠 Admin panel (Filament)
+
+`/admin` is a Filament v5 panel ("Dostra Admin") for **super users only**. It provides:
+
+- **Clients:** create, edit, delete, activate or deactivate, and manage webhook credentials.
+- **Users:** create and edit, set roles, assign clients.
+- **Leads:** browse and inspect.
+
+Authentication uses Laravel's normal session, separate from API tokens.
+
+---
+
+## 🧱 Project structure
+
+```
+app/
+├── Filament/Resources/        # Clients, Users, Leads admin resources
+├── Http/
+│   ├── Controllers/           # Auth, Client, ClientWebhookSecret, Lead, User, Webhook
+│   ├── Middleware/            # ValidateLeadWebhookSignature
+│   ├── Requests/              # Form Requests: all validation lives here
+│   └── Resources/             # API Resources: all JSON shapes live here
+├── Models/                    # Client, Lead, User
+├── Policies/                  # ClientPolicy, LeadPolicy, UserPolicy
+└── Providers/                 # Rate limiters, Filament panel
+bootstrap/app.php              # routing, proxy trust, PHP version guard
+database/                      # migrations, seeders
+docker/entrypoint.prod.sh      # production startup
+routes/api.php                 # every API route
+tests/                         # Pest feature tests
 ```
 
 ---
 
-## Rate Limits
+## 🧪 Testing
 
-| Endpoint | Limit |
+```bash
+php artisan test --compact                       # full suite
+php artisan test --compact --filter=Webhook      # subset
+vendor/bin/pint --dirty --format agent           # format changed PHP files
+```
+
+The suite uses in-memory SQLite (set in `phpunit.xml`) and currently has **63 passing tests**:
+
+| Area | Covered |
+|------|---------|
+| Auth | login, `/me`, logout, token behaviour |
+| Access control | clients, users, leads, per role |
+| Webhook | signing, timestamps, inactive clients, idempotency |
+| Lead listing | filters, search, pagination |
+| Secrets | rotation |
+| Platform | rate limits, trusted proxies, Filament access |
+
+> **Tests fail with `could not translate host name "db"`?** A stale config cache from a Docker run is overriding `phpunit.xml`. Run `php artisan config:clear`.
+
+Conventions for contributors: Form Requests for validation, API Resources for responses, `php artisan make:` for scaffolding, `config()` rather than `env()` outside config files, `Model::query()` over `DB::`, and a Pest test for every change.
+
+---
+
+## 🏭 Production
+
+Build with `Dockerfile.prod` (PHP 8.5.12 FPM, Alpine, non-root `www-data`, no dev dependencies). Behind Nginx it runs as part of the deploy repo's production stack:
+
+```bash
+cd ..   # dostra-deploy
+./scripts/docker-deploy-prod.sh
+```
+
+On start, `docker/entrypoint.prod.sh`:
+
+1. `php artisan optimize` (caches config, routes, events and views using the real environment)
+2. `php artisan migrate --force --isolated` (skip with `RUN_MIGRATIONS=false`)
+3. `exec php-fpm`
+
+Notes:
+
+- **PHP is version-guarded.** `composer.json` requires `~8.4.27 || ^8.5.12`, and `bootstrap/app.php` refuses to boot on older patch levels because of two critical PHP security bugs.
+- **Proxies are trusted** (`trustProxies(at: '*')`) because PHP-FPM is only reachable from Nginx. Don't expose port 9000 publicly.
+- **Production never seeds users.** Create the first `super_user` by hand:
+
+  ```bash
+  docker exec -it dostra-api-prod php artisan tinker
+  ```
+
+  ```php
+  App\Models\User::create(['name' => 'You', 'email' => 'you@example.com', 'password' => 'strong-password', 'role' => 'super_user']);
+  ```
+
+- **Cache and locks:** production uses `CACHE_STORE=file`, which is fine for one container. Use Redis if you run several replicas.
+- Logs go to `stderr`. Read them with `docker logs dostra-api-prod`.
+
+Full guide: [`dostra-deploy/docs/DEPLOY.md`](https://github.com/chetannagar/dostra-deploy/blob/master/docs/DEPLOY.md).
+
+---
+
+## ⚙️ Environment
+
+| Variable | Notes |
 |----------|-------|
-| `POST /api/login` | 5 / minute per email + IP |
-| `POST /api/webhook/leads` | 60 / minute per `X-Client-Key` |
-| Authenticated CRM | 120 / minute per user |
-
----
-
-## Data Model
-
-```
-┌────────────────┐         ┌──────────────┐       ┌──────────────┐
-│   clients      │         │ client_user  │       │    users     │
-│────────────────│         │──────────────│       │──────────────│
-│ id             │───┐     │ client_id ───┼───┐   │ id           │
-│ name           │   └───▶ │ user_id   ───┼┐  │   │ name         │
-│ client_key     │         └──────────────┘│  └──▶│ email        │
-│ webhook_secret │                         │      │ password     │
-│ is_active      │                         └─────▶│ role         │
-└────────────────┘                                └──────────────┘
-       │
-       │ 1:many
-       ▼
-┌──────────────────┐
-│    leads         │
-│──────────────────│
-│ id               │
-│ client_id        │
-│ name             │
-│ email            │
-│ message          │
-│ source           │
-│ webhook_event_id │
-│ raw_payload      │
-└──────────────────┘
-```
-
----
-
-## Local Seed Users
-
-| Role | Email | Password |
-|------|-------|----------|
-| `super_user` | `superuser@example.com` | `password` |
-| `admin` | `admin@example.com` | `password` |
-| `client` | `client@example.com` | `password` |
-| `client` | `client2@example.com` | `password` |
-
-Two seeded clients (`client_1`, `client_2`) are available for local webhook testing. `client@example.com` is assigned to `client_1`; `client2@example.com` to `client_2`.
-
----
-
-## Testing
-
-Run the full test suite:
-
-```bash
-php artisan test --compact
-```
-
-Format PHP files:
-
-```bash
-vendor/bin/pint --dirty --format agent
-```
-
----
-
-## Current Scope
-
-```
-✦  Signed Zapier webhook ingestion
-✦  Per-client lead storage
-✦  Webhook idempotency
-✦  Token-based CRM auth (Sanctum)
-✦  Three-tier role system (super_user / admin / client)
-✦  Filament admin panel (/admin, super_user only)
-✦  Client management with auto-generated keys and secrets
-✦  User management
-✦  Paginated lead retrieval with filters
-✦  Policy-backed API authorisation
-✦  Rate limiting
-```
+| `APP_KEY` | Required. Generate with `php artisan key:generate`. |
+| `APP_URL` | Public URL of the app |
+| `DB_CONNECTION` | `pgsql` (default in `.env.example`) or `sqlite` |
+| `DB_HOST` · `DB_PORT` · `DB_DATABASE` · `DB_USERNAME` · `DB_PASSWORD` | PostgreSQL connection |
+| `SESSION_DRIVER` · `QUEUE_CONNECTION` · `CACHE_STORE` | `database` by default; `CACHE_STORE=file` in production |
 
 ---
 
@@ -420,5 +539,5 @@ Internal use only. Add a licence file if this becomes public.
 ---
 
 <div align="center">
-<sub>Built with Laravel · PHP · Sanctum</sub>
+<sub>Built with Laravel · Filament · Sanctum · Pest</sub>
 </div>
