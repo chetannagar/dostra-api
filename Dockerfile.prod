@@ -4,42 +4,46 @@
 # - uses PHP-FPM (not php artisan serve) — Nginx proxies requests to it
 # - installs Composer dependencies without dev packages
 # - optimizes the autoloader for faster class resolution
-# - caches routes, views, and events at build time (no env vars needed)
-# - does NOT cache config at build time — env vars are not available then
-# - runs as www-data (non-root) for security
+# - caches config, routes, events, and views at container startup
+#   (php artisan optimize), when the real env vars are available
+# - runs entirely as www-data (non-root): startup commands and PHP-FPM
 # - source is copied into the image — no bind mounts in production
-# - config cache + migrations run at container startup via CMD
+# - startup logic lives in docker/entrypoint.prod.sh
+# - migrations run at startup by default; set RUN_MIGRATIONS=false to disable
 
-FROM php:8.4-fpm-alpine
+# Pin PHP to an exact patched release instead of a floating tag, which could
+# silently reuse an old cached image.
+# Must satisfy "php" in composer.json (~8.4.27 || ^8.5.12).
+# To upgrade PHP later, bump this value and rebuild.
+ARG PHP_VERSION=8.5.12
+FROM php:${PHP_VERSION}-fpm-alpine
 
 # Application path inside the container.
 WORKDIR /var/www/html
 
-# Install system packages and PHP extensions required by this Laravel + Filament app.
+# Install system packages and the PHP extensions this Laravel + Filament app
+# needs that are NOT already in the official image.
 # - git/unzip: needed by Composer
-# - libicu-dev: required for intl
-# - libonig-dev: required for mbstring
-# - libpq-dev: required for pdo_pgsql
-# - libxml2-dev: required for dom/xml
+# - icu-dev: required for intl
+# - postgresql-dev: required for pdo_pgsql
 # - libzip-dev: required for zip
+#
+# Already built into the official php image, so NOT listed here:
+# dom, xml, mbstring, pdo, opcache. Recompiling them fails on PHP 8.5
+# (dom now depends on the bundled Lexbor parser), and OPcache is a built-in,
+# always-on part of PHP since 8.5.
 RUN apk add --no-cache \
         git \
         unzip \
         icu-dev \
-        oniguruma-dev \
         postgresql-dev \
-        libxml2-dev \
         libzip-dev \
     && docker-php-ext-install \
         bcmath \
-        dom \
         exif \
         intl \
-        mbstring \
         pcntl \
-        pdo \
         pdo_pgsql \
-        xml \
         zip
 
 # Copy Composer from the official image.
@@ -50,10 +54,17 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 # not on every app code change.
 COPY composer.json composer.lock ./
 
-# Install production dependencies only.
+# Install production dependencies only, without scripts or autoloader.
+# - --no-scripts: composer.json scripts call "php artisan ...", but artisan
+#   and the app source don't exist in the image yet at this point.
+# - --no-autoloader: the autoloader is generated after the source is copied
+#   (see below), because it needs to see the app/ classes.
+# This step still checks the container's PHP version against composer.json,
+# so an unpatched base image fails the build here.
 RUN composer install \
     --no-dev \
-    --optimize-autoloader \
+    --no-scripts \
+    --no-autoloader \
     --no-interaction \
     --no-progress \
     --prefer-dist
@@ -61,8 +72,19 @@ RUN composer install \
 # Copy the rest of the application source.
 COPY . .
 
-# Prepare Laravel writable directories and set ownership so PHP-FPM (www-data)
-# can write to storage and bootstrap/cache.
+# Now that the full source is present, generate the optimized autoloader.
+# This also:
+# - runs the post-autoload-dump scripts (package:discover, filament:upgrade)
+# - regenerates vendor/composer/platform_check.php, which blocks
+#   unsupported PHP versions at runtime
+RUN composer dump-autoload \
+    --optimize \
+    --no-dev \
+    --no-interaction
+
+# Prepare Laravel writable directories and give them to www-data, the user
+# the container runs as. Done after all build steps that write files, so
+# nothing in these directories ends up owned by root.
 RUN mkdir -p \
         storage/framework/cache \
         storage/framework/sessions \
@@ -70,21 +92,16 @@ RUN mkdir -p \
         storage/logs \
         bootstrap/cache \
     && chown -R www-data:www-data storage bootstrap/cache \
-    && chmod -R ug+rwx storage bootstrap/cache
+    && chmod -R ug+rwx storage bootstrap/cache \
+    && chmod +x docker/entrypoint.prod.sh
 
-# Cache routes, views, and events at build time.
-# These do not require env vars so they are safe to run during the build.
-# Config cache is intentionally excluded — it needs real env vars (APP_KEY,
-# DB_HOST, etc.) which are only available at runtime.
-RUN php artisan route:cache \
-    && php artisan view:cache \
-    && php artisan event:cache
+# Run everything from here on as www-data (non-root): the startup script,
+# artisan commands, and the PHP-FPM master process.
+USER www-data
 
 # PHP-FPM listens on port 9000. Nginx will proxy requests to this port.
 EXPOSE 9000
 
-# At container startup:
-# 1. Cache config using the real runtime env vars injected by Docker/orchestrator.
-# 2. Run any pending migrations (--force bypasses the production prompt).
-# 3. Start PHP-FPM in the foreground.
-CMD ["sh", "-c", "php artisan config:cache && php artisan migrate --force && php-fpm"]
+# Startup: cache, migrate (optional), then hand over to PHP-FPM.
+# See docker/entrypoint.prod.sh.
+CMD ["/var/www/html/docker/entrypoint.prod.sh"]
